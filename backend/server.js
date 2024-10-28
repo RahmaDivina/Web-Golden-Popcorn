@@ -403,6 +403,54 @@ app.get('/api/countries', async (req, res) => {
   }
 });
 
+// Endpoint untuk menambah country baru
+app.post('/api/countries', async (req, res) => {
+  const { name, isDefault } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO countries (name, is_default) VALUES ($1, $2) RETURNING *',
+      [name, isDefault]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// Endpoint untuk mengupdate data country
+app.put('/api/countries/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, isDefault } = req.body;
+  try {
+    // Jika `isDefault` diset ke `true`, set semua country lain menjadi `false`
+    if (isDefault) {
+      await pool.query('UPDATE countries SET is_default = false');
+    }
+
+    const result = await pool.query(
+      'UPDATE countries SET name = $1, is_default = $2 WHERE id_country = $3 RETURNING *',
+      [name, isDefault, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// Endpoint untuk menghapus country
+app.delete('/api/countries/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM countries WHERE id_country = $1', [id]);
+    res.json({ message: 'Country deleted successfully' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 //app.get('/api/awards', async (req, res) => {
 //  try {
 //    const result = await pool.query('SELECT name FROM awards ORDER BY name');
