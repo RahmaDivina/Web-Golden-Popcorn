@@ -2,19 +2,22 @@ import React, { useState, useEffect } from 'react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import Filter from '../../components/Filter';
-import MovieGrid from '../../components/MovieGrid';
+import MovieGrid from '../../components/MovieGridHome';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
+import Slider from "react-slick";
 
 
 const HomePage = () => {
   const navigate = useNavigate();
   const [movies, setMovies] = useState([]);
+  const [topMovies, setTopMovies] = useState([]); // State untuk menyimpan 10 film populer
   const [sortedMovies, setSortedMovies] = useState([]);
   const [sortBy, setSortBy] = useState('alphabetics-az');
   const [resetFilters, setResetFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const moviesPerPage = 20;
+
 
   useEffect(() => {
     // Dapatkan token dari query parameter di URL
@@ -52,6 +55,7 @@ const HomePage = () => {
       const res = await fetch(`http://localhost:5000/api/movies/all?page=${page}&limit=${moviesPerPage}`);
       const data = await res.json(); // Mengubah respons API menjadi JSON
       setMovies(data); // Update state movies dengan data baru
+      setTopMovies(data.slice(0, 10)); // Simpan 10 film teratas untuk slider
     } catch (err) {
       console.error('Error fetching movies:', err); // Menangani error
     }
@@ -108,36 +112,167 @@ const HomePage = () => {
     }
   };
 
+  // Fungsi untuk menambahkan movie ke watchlist
+  const handleAddWatchlist = (movie) => {
+    const token = localStorage.getItem('userToken');
+
+    if (!token) {
+        // Jika belum login, redirect ke halaman login
+        window.location.href = '/login'; 
+        return;
+    }
+
+    // Jika sudah login, kirim request ke API untuk menambahkan movie ke watchlist
+    fetch('/api/watchlist', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ movieId: movie.id })
+    })
+    .then(response => {
+        if (response.ok) {
+            // Tampilkan notifikasi (di sini menggunakan alert, tapi di aplikasi nyata bisa gunakan React-Toastify atau modal popup)
+            alert(`${movie.title} has been added to your watchlist.`);
+        } else {
+            // Tampilkan error jika gagal
+            alert('Failed to add movie to watchlist. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error adding movie to watchlist:', error);
+        alert('An error occurred. Please try again later.');
+    });
+};
+
+const goToDetailPage = (title) => {
+    const encodedTitle = encodeURIComponent(title); // Encode title
+    navigate(`/movie/title/${encodedTitle}`); // Navigasi ke halaman detail film dengan id
+};
+
+  // Pengaturan untuk slider
+  const sliderSettings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 6, // Menampilkan 4 film sekaligus
+    slidesToScroll: 1,
+    responsive: [
+      {
+        breakpoint: 1024,
+        settings: {
+          slidesToShow: 5,
+          slidesToScroll: 1,
+          infinite: true,
+          dots: true,
+        },
+      },
+      {
+        breakpoint: 600,
+        settings: {
+          slidesToShow: 4,
+          slidesToScroll: 1,
+        },
+      },
+      {
+        breakpoint: 480,
+        settings: {
+          slidesToShow: 3,
+          slidesToScroll: 1,
+        },
+      },
+      {
+        breakpoint: 480,
+        settings: {
+          slidesToShow: 2,
+          slidesToScroll: 1,
+        },
+      },
+      {
+        breakpoint: 480,
+        settings: {
+          slidesToShow: 2,
+          slidesToScroll: 1,
+        },
+      },
+      {
+        breakpoint: 480,
+        settings: {
+          slidesToShow: 1,
+          slidesToScroll: 1,
+        },
+      },
+    ],
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <Header />
-      <main className="flex-grow-1 d-flex">
-        <Filter 
-          onFilterChange={handleFilterChange} 
-          resetFilters={resetFilters} 
-          onResetComplete={() => setResetFilters(false)} 
-        />
-        <div className="col-md-10 mt-3">
-          <div className="d-flex justify-content-end gap-2 align-items-center mb-3">
-            <label htmlFor="sort" className="form-label mb-0">Sorted by:</label>
-            <select id="sort" className="form-select w-auto" value={sortBy} onChange={handleSortChange}>
-              <option value="alphabetics-az">Alphabetics A-Z</option>
-              <option value="alphabetics-za">Alphabetics Z-A</option>
-              <option value="rating">Rating</option>
-              <option value="year-asc">Year (Oldest to Newest)</option>
-              <option value="year-desc">Year (Newest to Oldest)</option>
-            </select>
-          </div>
-          <MovieGrid movies={sortedMovies} />
-          {/* Tombol Pagination */}
-          <div className="d-flex justify-content-center gap-2 align-items-center mb-3" >
-            <Button className="btn-golden" onClick={handlePrevPage} disabled={currentPage === 1}>
-              Previous
-            </Button>
-            <span>Page {currentPage}</span>
-            <Button className="btn-golden" onClick={handleNextPage}>
-              Next
-            </Button>
+      <main className="main-container flex-grow-1 d-flex">
+        <div className="filter-section col-md-3">
+          <Filter
+            onFilterChange={handleFilterChange}
+            resetFilters={resetFilters} 
+            onResetComplete={() => setResetFilters(false)}
+          />
+        </div>
+
+        <div className="movie-grid-section col-md-9 mt-3">
+          <h2>Top 10 Popular Movies</h2>
+          <Slider {...sliderSettings}>
+            {topMovies.map((movie) => (
+              <div key={movie.id_movie} className="movie-slide">
+                <img 
+                  src={movie.poster || '/images/default-movie.png'} 
+                  alt={movie.title} 
+                  className="movies-image img-fluid rounded"
+                  style={{ cursor: 'pointer' }}  
+                  onClick={() => goToDetailPage(movie.title)}
+                  onError={(e) => { 
+                    e.target.onerror = null; 
+                    e.target.src = '/images/default-movie.png'; 
+                  }}
+                />
+                <div className="btn-wrapper">
+                  <button className="btn-add-watchlist" onClick={() => handleAddWatchlist(movie)}>
+                    Add Watchlist
+                  </button>
+                  <button className="btn-trailer" onClick={() => window.open(movie.trailer, '_blank')}>
+                    Trailer
+                  </button>
+                </div>
+                <h5 className="movies-title mt-2">
+                  {movie.title}
+                </h5>
+              </div>
+            ))}
+          </Slider>
+
+          {/* Bagian All Movies */}
+          <div className="all-movies-section mt-3">
+            <h2>All Movies</h2> 
+            <div className="d-flex justify-content-end gap-2 align-items-center mb-3">
+              <label htmlFor="sort" className="form-label mb-0">Sorted by:</label>
+              <select id="sort" className="form-select w-auto" value={sortBy} onChange={handleSortChange}>
+                <option value="alphabetics-az">Alphabetics A-Z</option>
+                <option value="alphabetics-za">Alphabetics Z-A</option>
+                <option value="rating">Rating</option>
+                <option value="year-asc">Year (Oldest to Newest)</option>
+                <option value="year-desc">Year (Newest to Oldest)</option>
+              </select>
+            </div>
+            <MovieGrid movies={sortedMovies} />
+            {/* Tombol Pagination */}
+            <div className="d-flex justify-content-center gap-2 align-items-center mb-3">
+              <Button className="btn-golden" onClick={handlePrevPage} disabled={currentPage === 1}>
+                Previous
+              </Button>
+              <span>Page {currentPage}</span>
+              <Button className="btn-golden" onClick={handleNextPage}>
+                Next
+              </Button>
+            </div>
           </div>
         </div>
       </main>
@@ -147,3 +282,5 @@ const HomePage = () => {
 };
 
 export default HomePage;
+
+
